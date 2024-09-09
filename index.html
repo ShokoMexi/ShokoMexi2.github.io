@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF Bearbeitung Webseite - Dunkles Design</title>
-    <!-- PDF.js CSS -->
+    <!-- PDF.js Bibliothek -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -15,7 +16,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             height: 100vh;
         }
 
@@ -49,6 +50,8 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
             border-radius: 10px;
             padding: 10px;
+            position: relative;
+            margin-bottom: 20px;
         }
 
         #canvas {
@@ -64,7 +67,7 @@
             gap: 10px;
         }
 
-        button {
+        button, .toggle-button {
             padding: 10px 20px;
             border: none;
             background-color: #1e88e5;
@@ -74,39 +77,40 @@
             transition: background-color 0.3s, transform 0.2s;
         }
 
-        button:hover {
+        button:hover, .toggle-button:hover {
             background-color: #1565c0;
             transform: scale(1.05);
         }
 
-        button:active {
+        button:active, .toggle-button:active {
             transform: scale(1);
         }
 
-        .fade-in {
-            animation: fadeIn 1s ease-out forwards;
+        .toggle-button.active {
+            background-color: #f44336;
         }
 
-        @keyframes fadeIn {
-            0% {
-                opacity: 0;
-            }
-            100% {
-                opacity: 1;
-            }
+        #zoomControls {
+            display: flex;
+            gap: 10px;
         }
     </style>
-    <!-- PDF.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 </head>
 <body>
     <h1>PDF Hochladen und Bearbeiten</h1>
-    <input type="file" id="fileInput" accept=".pdf" class="fade-in">
+    <input type="file" id="fileInput" accept=".pdf">
+    
     <div id="controls">
-        <button id="clearButton">Zeichnung löschen</button>
+        <button id="clearButton" class="toggle-button">Zeichnung löschen</button>
+        <button id="drawButton" class="toggle-button">Zeichnen ein/aus</button>
+        <div id="zoomControls">
+            <button id="zoomInButton">Vergrößern</button>
+            <button id="zoomOutButton">Verkleinern</button>
+        </div>
         <button id="downloadButton">PDF herunterladen</button>
     </div>
-    <div id="pdfViewer" class="fade-in">
+
+    <div id="pdfViewer">
         <canvas id="canvas"></canvas>
     </div>
 
@@ -115,11 +119,15 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const clearButton = document.getElementById('clearButton');
+        const drawButton = document.getElementById('drawButton');
+        const zoomInButton = document.getElementById('zoomInButton');
+        const zoomOutButton = document.getElementById('zoomOutButton');
         const downloadButton = document.getElementById('downloadButton');
 
         let pdfDoc = null;
         let currentPage = 1;
         let isDrawing = false;
+        let isDrawingEnabled = false;
         let scale = 1.5;  // Skalierung für die PDF-Seite
 
         // PDF-Datei hochladen und anzeigen
@@ -149,13 +157,21 @@
                     canvasContext: ctx,
                     viewport: viewport
                 };
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Canvas vor dem Rendern löschen
                 await page.render(renderContext).promise;
             }
         }
 
-        // Zeichnen aktivieren
+        // Zeichnen aktivieren/deaktivieren
+        drawButton.addEventListener('click', () => {
+            isDrawingEnabled = !isDrawingEnabled;
+            drawButton.classList.toggle('active', isDrawingEnabled);
+        });
+
         canvas.addEventListener('mousedown', () => {
-            isDrawing = true;
+            if (isDrawingEnabled) {
+                isDrawing = true;
+            }
         });
 
         canvas.addEventListener('mouseup', () => {
@@ -164,7 +180,7 @@
         });
 
         canvas.addEventListener('mousemove', (event) => {
-            if (isDrawing) {
+            if (isDrawing && isDrawingEnabled) {
                 const rect = canvas.getBoundingClientRect();
                 const x = event.clientX - rect.left;
                 const y = event.clientY - rect.top;
@@ -179,6 +195,17 @@
         clearButton.addEventListener('click', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             renderPage(currentPage);  // PDF erneut rendern, um Hintergrund wiederherzustellen
+        });
+
+        // Vergrößern und Verkleinern
+        zoomInButton.addEventListener('click', () => {
+            scale += 0.1;
+            renderPage(currentPage);
+        });
+
+        zoomOutButton.addEventListener('click', () => {
+            scale = Math.max(scale - 0.1, 0.5);  // Skalierung nicht kleiner als 0.5
+            renderPage(currentPage);
         });
 
         // PDF herunterladen
