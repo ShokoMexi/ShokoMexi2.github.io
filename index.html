@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Bearbeitung Webseite - Dunkles Design</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        #fileInput {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            border: 2px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #fileInput:hover {
+            background-color: #333;
+        }
+
+        #pdfViewer {
+            border: 1px solid #333;
+            width: 80%;
+            height: 600px;
+            overflow: auto;
+            background-color: #1e1e1e;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        #canvas {
+            border: 1px solid #444;
+            cursor: crosshair;
+            background-color: #2b2b2b;
+            border-radius: 8px;
+        }
+
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #1e88e5;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
+        button:hover {
+            background-color: #1565c0;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(1);
+        }
+
+        .fade-in {
+            animation: fadeIn 1s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF Hochladen und Bearbeiten</h1>
+    <input type="file" id="fileInput" accept=".pdf" class="fade-in">
+    <div id="controls">
+        <button id="clearButton">Zeichnung löschen</button>
+        <button id="downloadButton">PDF herunterladen</button>
+    </div>
+    <div id="pdfViewer" class="fade-in">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const clearButton = document.getElementById('clearButton');
+        const downloadButton = document.getElementById('downloadButton');
+
+        let pdfDoc = null;
+        let currentPage = 1;
+        let isDrawing = false;
+
+        // PDF-Datei hochladen und anzeigen
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    const typedArray = new Uint8Array(this.result);
+                    pdfDoc = await PDFLib.PDFDocument.load(typedArray);
+                    renderPage(currentPage);
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+
+        // Seite rendern
+        async function renderPage(pageNumber) {
+            if (pdfDoc) {
+                const page = pdfDoc.getPages()[pageNumber - 1];
+                const { width, height } = page.getSize();
+                canvas.width = width;
+                canvas.height = height;
+                const pdfPage = await page.renderToCanvas(canvas);
+            }
+        }
+
+        // Zeichnen aktivieren
+        canvas.addEventListener('mousedown', () => {
+            isDrawing = true;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            ctx.beginPath();
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (isDrawing) {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                ctx.lineTo(x, y);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        });
+
+        // Zeichnung löschen
+        clearButton.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        // PDF herunterladen
+        downloadButton.addEventListener('click', async () => {
+            if (pdfDoc) {
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'bearbeitet.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+    </script>
+</body>
+</html>
